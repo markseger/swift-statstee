@@ -1,0 +1,17 @@
+The tool runs as a daemon, listening to swift statsd events, writing then out
+as rolling counters to /var/log/swift/swift-stats and unless disabled, forwards
+them on to the port specifice in /etc/swift-stats.conf.  The accompanying tool
+swiftstat reads those stats and reports them interactively.
+
+Dependencies:
+
+statsd logging must be enabled in appropriate swift conf file(s).  See
+http://docs.openstack.org/developer/swift/admin_guide.html
+
+Installation:
+
+sudo python setup.py install
+
+Documentation:
+
+see manpages for swift-statstee and swiftstat

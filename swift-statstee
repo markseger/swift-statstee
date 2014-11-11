@@ -1,0 +1,80 @@
+#!/bin/sh
+# Startup script for swift-statstee on distros that support update-rc.d such
+# as debian & ubuintu
+#
+
+### BEGIN INIT INFO
+# Provides:          swift-statstee
+# Required-Start:    $all
+# Required-Stop:     $all
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start swift-statstee daemon
+# Description:       swift-statstee is a lightweight daemon that acts as
+#                    both a sync for swift's statsd events as well as
+#                    a 'tee', forwarding them off to a second port if
+#                    so configured.  It also updates /var/log/swift/swift-stats
+#                    to reflect counts of most swift/statsd events
+### END INIT INFO
+
+PYTHON=/usr/bin/python
+STATSTEE=/usr/bin/swift-statstee.py
+
+if [ ! -f $PYTHON ]; then
+    echo -n "Cannot find $PYTHON"
+    exit 0
+fi
+
+if [ ! -f $STATSTEE ]; then
+    echo -n "Cannot find $STATSTEE"
+    exit 0
+fi
+
+PNAME=swift-statstee
+PIDFILE="/var/run/$PNAME.pid"
+
+case "$1" in
+   start)
+      echo -n "Starting swift-statstee: $PNAME"
+      start-stop-daemon --quiet --stop --exec $PYTHON --pidfile $PIDFILE --test >/dev/null
+      if [ $? -eq 1 ]; then
+         start-stop-daemon --quiet --start --exec $STATSTEE -- -D
+	 echo "."
+      else
+	 echo " [already running]"
+      fi
+      ;;
+
+  stop)
+      echo -n "Stopping swift-statstee: $PNAME"
+
+      start-stop-daemon --quiet --stop --retry 2 --exec $PYTHON --pidfile $PIDFILE
+      if [ $? -eq 0 ]; then
+	 echo "."
+      else
+	 echo " [not running]"
+      fi
+      ;;
+
+  status)
+      start-stop-daemon --quiet --stop --exec $PYTHON --pidfile $PIDFILE --test >/dev/null
+      if [ $? -eq 0 ]; then
+          echo "$PNAME is running..."
+      else
+          echo "$PNAME is not running"
+	  exit 1
+      fi
+      ;;
+
+  restart|force-reload)
+      $0 stop
+      sleep 1
+      $0 start
+      ;;
+  *)
+	echo "Usage: $0 {start|stop|restart|force-reload|status}"
+	exit 1
+esac
+
+exit 0
+

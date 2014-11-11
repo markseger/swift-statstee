@@ -1,0 +1,118 @@
+.TH SWIFT-STATSTEE 1 "OCT 2014" LOCAL "swift-statstee" -*- nroff -*-
+.SH NAME
+stats - a daemon to collect/log statsd events locally and also forward them on
+
+.SH SYNOPSIS
+
+swift-statstee [-d] [-D] [-p [addr:]port] [--filter regx] [--term|--top] [-v]
+
+.SH DESCRIPTION
+
+By default, swift-statstee collects/reports counters for all swift services for which
+statsd monitoring is locally enabled via 'log_statsd_host' in the respective conf
+files.  See http://docs.openstack.org/developer/swift/admin_guide.html for details.
+If for some reason you don't want stats collected for a particular service
+type, you can set account, container, object and/or proxy to 'no' in the config file.
+
+On startup, the configuration is read from /etc/swift-statstee.conf which specifies
+a local UDP port on which to listen for statsd event messages.  If configured,
+those messages will be forwarded out the specified address and port as well.
+Neither the listening nor forwarding addresses and ports should be confused with
+those specified with -p which is special.  See section of running a second instance.
+
+Whenever a known event is received, swift-statstee counts it and every 0.1 seconds (or
+less often if nothing has changed) writes the full set as incrementing counters to
+/var/log/swift/swift-stats. Both the frequency and file name settings are
+configurable.  This mechanism allows multiple readers to access them - see swiftstat,
+also part of this package.
+
+The use of -d, the debugging mask which is defined in the beginning of the script,
+allows one to report diagnostics but not in daemon mode.
+
+-D causes swift-statstee to run as a daemon and is used by /etc/init.d/swift-statstee
+
+--filter regx is really there is an aid to developers or someone interested in looking
+at raw statsd event messages.  Any that match regx will be displayed on the terminal
+noting some may generate a lot of output!  You can also run a second copy with this
+switch so you can start/stop the display of filtered messages without interrupting
+the primary daemon.
+
+--term or --top causes stats to simultaneously be displayed on the terminal either
+as scrolling output or in 'top' format.  This is for use during development/testing
+or with --filt.
+
+-v reports the version and exists.
+
+.SH CONFIGURATION
+
+If you're already using statsd to send messages to a monitoring tool like graphite
+and don't want to continue to do so, rather than specifying graphite's addess and
+port in the swift configuration files, change the configuration to point to swift-statstee
+on the local host and configure swift-statstee with graphite's address and port.
+In other words if your current statsd setting in the swift conf files are:
+
+.br
+log_statsd_host = 10.0.0.1
+.br
+log_statsd_port = 8125
+
+change them to
+
+.br
+log_statsd_host = localhost
+.br
+log_statsd_port = 8126
+
+and configure swift-statstee.conf like this:
+
+.br
+port_in  = 8126
+.br
+addr_out = 10.0.0.1
+.br
+port_out = 8125
+
+When swift-statstee starts, it will write a message to the log to
+/var/log/swift/YYYYMM-hostname-swift-statstee.log
+describing both the input and output addresses and ports it is using.
+
+.SH RUNNING A SECOND INSTANCE
+
+The primary intent of this capability is to allow one to echo messages during normal
+operations, most typically by filting on a subset of them typically during development
+or testing without disturbing the running daemon.
+
+To use this capability, port_out (and optionally addr_out) must be configured and then
+all you need to is run swift-statstee in a terminal window and specify an optional address
+and required port on which to listen on with -p.  When you do, all functinality remains
+the same with the exception that udp packets will NOT be forwarded from this second copy
+and the statsd stats file will not be updated if such a port is configured.
+
+.SH EXAMPLES
+
+Running Main Daemon
+
+/etc/init.d/swift-statstee start
+
+will start the daemon based on communication settings in /etc/swift-statstee.conf
+
+To run a second copy on the local machine, echoing all object server PUT messages
+
+swift-statstee -p 8126 --filt PUT
+
+To run a copy on a remote machine, make sure addr_out is set in the config file and simply run
+the same command as above.  Depending on how your remote machine is configured, the messages
+may not show up on the 127.0.0.1 in which case you will need to listen on the explicit
+local addess like this:
+
+swift-statstee -p 10.22.170.17:8126 --filt object-server.PUT
+
+.SH RESTRICTIONS
+
+You may only run on copy of swift-statstee as a demon on a given machine.
+
+.SH AUTHOR
+
+This program was written by Mark Seger (mjseger@gmail.com)
+.br
+Copyright 2014 Hewlett-Packard Development Company, LP

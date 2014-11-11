@@ -1,0 +1,466 @@
+#!/usr/bin/python -u
+
+# Copyright 2014 Hewlett-Packard Development Company, L.P.
+# Use of this script is subject to HP Terms of Use at
+# http://www8.hp.com/us/en/privacy/terms-of-use.html.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#    http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import re
+import signal
+import sys
+import time
+from optparse import OptionParser, OptionGroup
+
+
+def error(text):
+    print text
+    sys.exit()
+
+
+def usage():
+
+    usage = "usage: swiftstat [-i|-l|-t|-v] option[,option...] "
+    usage += "where options are:\n"
+    options = '''
+                  account    container    object
+    auditor         aa          ca          oa
+    expirer                                 ox
+    reaper          ap
+    replicator      ar          cr          or
+    server          as          cs          os
+    sync                        cy
+    updater                     cu          ou
+
+    proxy           pa          pc          po
+    proxy+status    pas         pcs         pos
+
+    -i interval in seconds, def:1
+    -l number of lines between headers, def:20
+    -t is speficied, include timestamps
+    -v print version info and exit
+    '''
+
+    usage += options
+    error(usage)
+
+
+def getpad(width, title):
+
+    totpad = width - len(title)
+    pad = int(totpad / 2)
+    if totpad * 2 == 0:
+        pre = ' ' * (pad - 1)
+        post = ' ' * (pad + 1)
+    else:
+        pre = ' ' * pad
+        post = ' ' * (pad + 1)
+    return(pre, post)
+
+
+def print_header():
+
+    time_pad = '         ' if options.time else ''
+    header = time_pad
+
+    #    H e a d e r    L i n e    1
+
+    acc_width = con_width = obj_width = 0
+    if acc != '':
+        temp = ''
+        if re.search('aa', option_string):
+            temp += "---Auditor----|"
+        if re.search('ap', option_string):
+            temp += "---------------------Reaper---------------------|"
+        if re.search('ar', option_string):
+            temp += "----------------------Replicator----------------------|"
+        if re.search('as', option_string):
+            temp += "--------------Server--------------|"
+        temp = re.sub('\|$', '>', temp)
+        acc_width = len(temp)
+        header += '<' + temp
+
+    if con != '':
+        temp = ''
+        if re.search('ca', option_string):
+            temp += "---Auditor----|"
+        if re.search('cr', option_string):
+            temp += "----------------------Replicator----------------------|"
+        if re.search('cs', option_string):
+            temp += "--------------Server--------------|"
+        if re.search('cy', option_string):
+            temp += "----------Sync----------|"
+            if re.search('cu', option_string):
+                temp += "---Updater----|"
+        temp = re.sub('\|$', '>', temp)
+        con_width = len(temp)
+        header += '<' + temp
+
+    if obj != '':
+        temp = ''
+        if re.search('oa', option_string):
+            temp += "-Auditor-|"
+        if re.search('ox', option_string):
+            temp += "-Expirer-|"
+        if re.search('or', option_string):
+            temp += "-----Replicator------|"
+        if re.search('os', option_string):
+            temp += "-----------------------Server-----------------------|"
+        if re.search('ou', option_string):
+            temp += "---------Updater---------|"
+        temp = re.sub('\|$', '>', temp)
+        obj_width = len(temp)
+        header += '<' + temp
+
+    if prx != '':
+        # base headers for all 3 proxies are 4 chars wide + ' '
+        base_width = len(headers['prxyacc'].split()) * 5
+
+        # remember, the first char of proxy_type is unique wrt
+        # the values in prx, would include 's' as well
+        for proxy_type in ('acc', 'con', 'obj'):
+            if not re.search(proxy_type[0], prx):
+                continue
+
+            # if 's' appended to proxy types, leave room for status codes
+            pre = post = ''
+            if re.search('%ss' % proxy_type[0], prx):
+                proxy_keyname = 'prxy%s' % proxy_type
+                stat_width = len(stat_curr[proxy_keyname]) * 5
+                pre = post = '-' * int(stat_width / 2)
+                if stat_width % 2 != 0:
+                    post += '-'
+
+            header += '<%s-------------------------Proxy %s Server' % \
+                      (pre, proxy_type)
+            header += '-------------------------%s>' % post
+
+    # real ugly, but once we know the lengths of each section, we can
+    # preface the headers with the section names.  it's still not
+    # perfect in all cases but it's close enough!
+    pre_header = time_pad
+    if acc != '':
+        pre, post = getpad(acc_width, 'Account')
+        temp = "%sAccount%s" % (pre, post)
+        pre_header += temp
+
+    if con != '':
+        pre, post = getpad(con_width, 'Container')
+        temp = "%sContainer%s" % (pre, post)
+        pre_header += temp
+
+    if obj != '':
+        pre, post = getpad(obj_width, 'Object')
+        temp = "%sObject%s" % (pre, post)
+        pre_header += temp
+
+    print '%s\n%s' % (pre_header, header)
+
+    #    H e a d e r    L i n e    2
+
+    line = time_pad
+    if acc != '':
+        temp = ' '
+        if re.search('aa', option_string):
+            temp += headers['accaudt']
+        if re.search('ap', option_string):
+            temp += headers['accreap']
+        if re.search('al', option_string):
+            temp += headers['accrepl']
+        if re.search('as', option_string):
+            temp += headers['accsrvr']
+        line += temp
+
+    if con != '':
+        temp = ' '
+        if re.search('ca', option_string):
+            temp += headers['conaudt']
+        if re.search('cr', option_string):
+            temp += headers['conrepl']
+        if re.search('cs', option_string):
+            temp += headers['consrvr']
+        if re.search('cy', option_string):
+            temp += headers['consync']
+        if re.search('cu', option_string):
+            temp += headers['conupdt']
+        line += temp
+
+    if obj != '':
+        temp = ' '
+        if re.search('oa', option_string):
+            temp += headers['objaudt']
+        if re.search('ox', option_string):
+            temp += headers['objexpr']
+        if re.search('or', option_string):
+            temp += headers['objrepl']
+        if re.search('os', option_string):
+            temp += headers['objsrvr']
+        if re.search('ou', option_string):
+            temp += headers['objupdt']
+        line += temp
+
+    if prx != '':
+        if acc == '' and con == '' and obj == '':
+            line = ' '
+        for proxy_type in ('acc', 'con', 'obj'):
+            if not re.search(proxy_type[0], prx):
+                continue
+
+            # all line contain the base headers but status optional
+            proxy_keyname = 'prxy%s' % proxy_type
+            line += headers[proxy_keyname]
+            if re.search('%ss' % proxy_type[0], prx):
+                for name in sorted(stat_curr[proxy_keyname]):
+                    line += ' %4s' % name
+
+    print line
+
+
+def control_c_handler(signal, frame):
+    '''
+    control-c handler
+    '''
+    sys.exit(0)
+
+
+#    B u i l d    F o r m a t t i n g    C o n s t a n t s
+
+program = 'swiftstat'
+version = '0.9'
+copyright = 'Copyright 2014 Hewlett-Packard Development Company, L.P.'
+
+signal.signal(signal.SIGINT, control_c_handler)
+
+headers = {}
+headers['accaudt'] = 'Errs Pass Fail '
+headers['accreap'] = 'Errs CFail CDel CRem CPoss OFail ODel ORem OPoss '
+headers['accrepl'] = 'Diff DCap Nochg Hasm Rsync RMerg Atmpt Fail Remov Succ '
+headers['accsrvr'] = ' Put  Get Post Dele Head Repl Errs '
+headers['conaudt'] = 'Errs Pass Fail '
+headers['conrepl'] = 'Diff DCap Nochg Hasm Rsync RMerg Atmpt Fail Remov Succ '
+headers['consrvr'] = ' Put  Get Post Dele Head Repl Errs '
+headers['consync'] = 'Skip Fail Sync Dele  Put '
+headers['conupdt'] = 'Succ Fail NChg '
+headers['objaudt'] = 'Quar Errs '
+headers['objexpr'] = ' Obj Errs '
+headers['objrepl'] = 'PDel PUpd SHash SSync '
+headers['objsrvr'] = ' Put  Get Post Dele Head Repl Errs Quar Asyn PutTime'
+headers['objupdt'] = 'Errs Quar Succ Fail ULink '
+headers['prxyacc'] = ' Put  Get Post Dele Head Copy Opts BadM Errs HCnt HACnt'
+headers['prxyacc'] += ' TOut DConn'
+headers['prxycon'] = headers['prxyobj'] = headers['prxyacc']
+
+# build format line based on headers noting we always have
+# minimum width of 4
+formats = {}
+for type in headers:
+    fields = []
+    fields = headers[type].lstrip().split()
+    formats[type] = ''
+    for i in range(len(fields)):
+        width = len(fields[i]) if len(fields[i]) >= 4 else 4
+        formats[type] += ' {:%d}' % width
+
+# turns out the last field for objsrvr needs to be printed as a float
+# AND is the only one 7 chars wide
+formats['objsrvr'] = re.sub(':7', ':7.3f', formats['objsrvr'])
+#print "FORMATS:", formats['objsrvr']
+
+#    B e g i n
+
+statsfile = '/var/log/swift/statsd-stats'
+
+parser = OptionParser(add_help_option=False)
+parser.add_option('-i', dest='interval', help='monitoring interval',
+                  default='1')
+parser.add_option('-l', dest='lines',    help='lines between headers',
+                  default='20')
+parser.add_option('-t', dest='time',     help='include timestamps in output',
+                  default=False, action='store_true')
+parser.add_option('-v', dest='version',  help='print version and exit',
+                  default=False, action='store_true')
+(options, args) = parser.parse_args()
+
+if options.version:
+    print '%s V%s\n%s' % (program, version, copyright)
+    sys.exit()
+
+if len(sys.argv) == 1 or re.match('-', sys.argv[-1]):
+    usage()
+
+if not os.path.exists(statsfile):
+    error("stats file '%s' doesn't exist" % statsfile)
+
+if not re.match('^\d+$', options.interval):
+    error('interval must be an interger')
+interval = int(options.interval)
+
+if not re.match('^\d+$', options.lines):
+    error('lines between headers must be an interger')
+maxlines = int(options.lines)
+
+servers = ''
+option_string = sys.argv[-1]
+acc = con = obj = prx = ''
+for opt in option_string.split(','):
+    server = opt[0]
+    type = opt[1]
+
+    if server == 'a':
+        acc += type
+        if not re.search('a', servers):
+            servers += 'a'
+    elif server == 'c':
+        con += type
+        if not re.search('c', servers):
+            servers += 'c'
+    elif server == 'o':
+        obj += type
+        if not re.search('o', servers):
+            servers += 'o'
+    elif server == 'p':
+        prx += type
+        if len(opt) == 3 and opt[2] == 's':
+            prx += 's'
+        if not re.search('p', servers):
+            servers += 'p'
+
+f = open(statsfile, 'r')
+
+vals_curr = {}
+stat_curr = {}
+vals_last = {}
+stat_last = {}
+
+first = True
+line_number = -1
+while 1:
+
+    if line_number % maxlines == 0:
+        print_header()
+
+    #    P r o c e s s    W h o l e    S t a t s    F i l e
+
+    f.seek(0)
+    for line in f:
+        if re.match('#|V', line):
+            continue
+        #print line,
+
+        fields = []
+        fields = line.split()
+        type = fields.pop(0)
+
+        # init on first pass
+        if type not in vals_last:
+            vals_curr[type] = []
+            vals_last[type] = []
+            if re.match('p', type):
+                stat_last[type] = {}
+                stat_curr[type] = {}
+
+            for i in range(len(fields)):
+                if not re.search(':', fields[i]):
+                    vals_curr[type].append(0)
+                    vals_last[type].append(0)
+                else:
+                    status, count = fields[i].split(':')
+                    stat_last[type][status] = int(count)
+
+        # calculations
+        # NOTE - all fields are int() except puttime, which is float
+        for i in range(len(fields)):
+            #print "TYPE: %s FIELD[%d]: %s" % (type, i, fields[i])
+
+            # special case - although we reported both puttime AND putcount
+            # we're actually configued to report time/count as field 9
+            # even tough it's in field 10, store the rate in field 9
+            # since that the one that gets printed!
+            if type == 'objsrvr' and i == 9:
+                val1 = int(fields[i])        # count
+                val2 = float(fields[i+1])    # time
+                #print "VAL1: %d  VAL2: %f" % (val1, val2)
+                #print "LST1: %d  LST2: %f" % (vals_last[type][i], vals_last[type][i+1])
+                val1_curr = val1 - vals_last[type][i]
+                val2_curr = val2 - vals_last[type][i+1]
+                vals_curr[type][i] = val2_curr / val1_curr if val1_curr != 0 else 0
+                vals_last[type][i] = val1
+                vals_last[type][i+1] = val2
+                continue
+
+            if not re.search(':', fields[i]):
+                value = int(fields[i]) if type != 'objsrvr' or i != 10 else float(fields[i])
+                vals_curr[type][i] = value - vals_last[type][i]
+                vals_last[type][i] = value
+            else:
+                status, count = fields[i].split(':')
+                stat_curr[type][status] = int(count) - stat_last[type][status]
+                stat_last[type][status] = int(count)
+
+    #    O u t p u t
+
+    # skip first interval because will always be bogus
+    if not first:
+        line = ''
+        for server_type in ['acc', 'con', 'obj', 'prxy']:
+
+            # if not reporting data for this type of server, skip it
+            server_short = server_type[0]
+            if not re.search(server_short, servers):
+                continue
+
+            # purely a formatting thing
+            if server_type == 'con' and re.match('a', servers):
+                line += ' '
+            if server_type == 'obj' and (re.match('a', servers) or
+                                         re.match('c', servers)):
+                line += ' '
+
+            for data_type in sorted(headers):
+                if not re.match(server_type, data_type):
+                    continue
+
+                # we get the type of data from different fields for
+                # proxies AND in some cases as noted we change them
+                sub_type = data_type[3] if server_short != 'p' \
+                    else data_type[4]
+                if re.search('repl', data_type):
+                    sub_type = 'l'
+                elif re.search('expr', data_type):
+                    sub_type = 'x'
+                elif re.search('sync', data_type):
+                    sub_type = 'y'
+
+                type_code = server_short + sub_type
+                if not re.search(type_code, option_string):
+                    continue
+
+                # I hate special cases, but for now we DON'T print putcount
+                # but DO use it to calculate puttime rate
+                line += formats[data_type].format(*vals_curr[data_type])
+
+                # if proxy see if we  need to report status on a proxy type basis
+                if server_type == 'prxy':
+                    if re.search('%ss' % data_type[4], prx):
+                        for status in sorted(stat_curr[data_type]):
+                            fmt = stat_curr[data_type][status]
+                            line += ' {:4d}'.format(fmt)
+
+        if options.time:
+            print time.strftime('%H:%M:%S', time.localtime()),
+        print line
+
+    time.sleep(interval)
+    first = False
+    line_number += 1

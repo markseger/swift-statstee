@@ -1,0 +1,45 @@
+.TH SWIFTSTAT 1 "OCT 2014" LOCAL "swiftstat" -*- nroff -*-
+.SH NAME
+swiftstat - a swift statistics monitoring tool
+
+.SH SYNOPSIS
+
+swiftstat [-i|-l|-t] option[,option...] where options are one or more of:
+
+                  account    container    object
+    auditor         aa          ca          oa
+    expirer                                 ox
+    reaper          ar
+    replicator      al          cl          ol
+    server          as          cs          os
+    sync                        cy
+    updater                     cu          ou
+
+    proxy           pa          pc          po
+    proxy+status    pas         pcs         pos
+
+    -i interval in seconds, def:1
+    -l number of lines between headers, def:20
+    -t is speficied, include timestamps
+
+.SH DESCRIPTION
+
+Depending on the combinations of options selected, swiftstat produces a single line of output
+every second, unless -i is specified in which case that interval is used.  Since swifstat can
+use a lot of horizontal space when mutliple options are chosed, the time is explictly excluded
+from the output.  -t will include the time.  By default, headers are displayed every 20 lines
+and this can be changed to a different number with -l.
+
+One additional switch is available but only used for development/testing and that is -f, which
+allows one to tell swiftstat to read statistics from a file other than /var/log/swift/statsd-stats.
+
+.SH RESTRICTIONS
+
+swiftstat expects the file /var/log/swift/statsd-stats to be updated by the statsd-procy daemon.
+If that daemon isn't running, the output will be all 0s and never change.
+
+.SH AUTHOR
+
+This program was written by mark Seger (mjseger@gmail.com)
+.br
+Copyright 2014 Hewlett-Packard Development Company, LP
