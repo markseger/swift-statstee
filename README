@@ -1,6 +1,6 @@
-The tool runs as a daemon, listening to swift statsd events, writing then out
+The tool runs as a daemon, listening to swift statsd events, writing them out
 as rolling counters to /var/log/swift/swift-stats and unless disabled, forwards
-them on to the port specifice in /etc/swift-stats.conf.  The accompanying tool
+them on to the port specified in /etc/swift-stats.conf.  The accompanying tool
 swiftstat reads those stats and reports them interactively.
 
 Dependencies:

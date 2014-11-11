@@ -237,7 +237,7 @@ def control_c_handler(signal, frame):
 #    B u i l d    F o r m a t t i n g    C o n s t a n t s
 
 program = 'swiftstat'
-version = '0.9'
+version = '1.0'
 copyright = 'Copyright 2014 Hewlett-Packard Development Company, L.P.'
 
 signal.signal(signal.SIGINT, control_c_handler)
@@ -279,7 +279,7 @@ formats['objsrvr'] = re.sub(':7', ':7.3f', formats['objsrvr'])
 
 #    B e g i n
 
-statsfile = '/var/log/swift/statsd-stats'
+statsfile = '/var/log/swift/swift-stats'
 
 parser = OptionParser(add_help_option=False)
 parser.add_option('-i', dest='interval', help='monitoring interval',
@@ -435,8 +435,8 @@ while 1:
                 # proxies AND in some cases as noted we change them
                 sub_type = data_type[3] if server_short != 'p' \
                     else data_type[4]
-                if re.search('repl', data_type):
-                    sub_type = 'l'
+                if re.search('reap', data_type):
+                    sub_type = 'p'
                 elif re.search('expr', data_type):
                     sub_type = 'x'
                 elif re.search('sync', data_type):

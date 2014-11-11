@@ -40,6 +40,13 @@ from optparse import OptionParser, OptionGroup
 
 def logmsg(severity, text):
 
+    # when running as a second instance we don't care about logging because:
+    # - we're running interactively and will see any errors
+    # - this may not even be a machine with /var/log/swift on it
+    if options.port:
+        print text
+        return
+
     timestamp = time.strftime("%Y%m", time.gmtime())
     logfile = '%s/%s-%s-statstee.log' % \
         (logdir, time.strftime("%Y%m", time.gmtime()),
@@ -189,7 +196,7 @@ def init_opers(statsfile):
             else:
                 type, vals = vals.split(' ', 1)
                 logvals['prxsrvr'][type] = vals.split()
-    else:
+    elif not options.port:    # only if primary instance
         statslog = open(statsfile, 'w')
 
     opers = {}
@@ -373,7 +380,11 @@ def report():
     one line at a time via called to logger()
     """
 
-    # gotta do wiht a write because print generates trailing space
+    # if not first instance we DON'T write any stats out
+    if options.port:
+        return
+
+    # gotta do with a write because print generates trailing space
     if options.top:
         top = '%c[H%c[J' % (27, 27)
         sys.stdout.write(top)
