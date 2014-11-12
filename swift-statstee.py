@@ -704,8 +704,6 @@ def main():
             listen_addr = localhost
             listen_port = options.port
         listen_port = int(listen_port)
-        print "%s:%s" % (listen_addr, listen_port)
-
         msg = "listening on port %s, logging disabled!" % listen_port
     if debug & 2:
         print msg
@@ -737,10 +735,10 @@ def main():
     if port_out:
         if options.port == '':
             message += ', echoing to %s:%d' % (addr_out, port_out)
+            message += ', logging every %0.1f secs' % frequency
         else:
             port_out = 0
-            message += ', forwarding disabled'
-    message += ', logging every %0.1f secs' % frequency
+            message += ', forwarding and updating stats disabled'
     logmsg('I', message)
 
     if options.daemon:
