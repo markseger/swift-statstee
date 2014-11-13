@@ -4,7 +4,7 @@ stats - a daemon to collect/log statsd events locally and also forward them on
 
 .SH SYNOPSIS
 
-swift-statstee [-d] [-D] [-p [addr:]port] [--filter regx] [--term|--top] [-v]
+swift-statstee [-d] [-D] [-p [addr:]port] [--filter regx] [--ignore regx] [--term|--top] [-v]
 
 .SH DESCRIPTION
 
@@ -31,11 +31,14 @@ allows one to report diagnostics but not in daemon mode.
 
 -D causes swift-statstee to run as a daemon and is used by /etc/init.d/swift-statstee
 
---filter regx is really there is an aid to developers or someone interested in looking
+--filter is really there is an aid to developers or someone interested in looking
 at raw statsd event messages.  Any that match regx will be displayed on the terminal
 noting some may generate a lot of output!  You can also run a second copy with this
 switch so you can start/stop the display of filtered messages without interrupting
 the primary daemon.
+
+--ignore like --filter allows you to reduce the volume of output when looking at
+raw event messages, in this case those that match the pattern are ignored
 
 --term or --top causes stats to simultaneously be displayed on the terminal either
 as scrolling output or in 'top' format.  This is for use during development/testing
@@ -79,14 +82,20 @@ describing both the input and output addresses and ports it is using.
 .SH RUNNING A SECOND INSTANCE
 
 The primary intent of this capability is to allow one to echo messages during normal
-operations, most typically by filting on a subset of them typically during development
-or testing without disturbing the running daemon.
+operations, most typically by filting or ignoring a subset of them, typically during
+development or testing without disturbing the running daemon.
 
 To use this capability, port_out (and optionally addr_out) must be configured and then
 all you need to is run swift-statstee in a terminal window and specify an optional address
-and required port on which to listen on with -p.  When you do, all functinality remains
-the same with the exception that udp packets will NOT be forwarded from this second copy
-and the statsd stats file will not be updated if such a port is configured.
+and required port on which to listen on with -p.  When you do, all functionality remains
+the same with several exceptions:
+
+.br
+- udp packets will NOT be forwarded from this second copy
+.br
+- the statsd stats file will not be updated
+.br
+- counters displayed with --top or --home will ONLY reflect the filtering
 
 .SH EXAMPLES
 

@@ -370,8 +370,8 @@ def logger(line):
 
     if options.term == True or options.top:
         print line
-    if not options.port:
-        statslog.write('%s\n' % line)
+    
+    statslog.write('%s\n' % line)
 
 
 def report():
@@ -379,10 +379,6 @@ def report():
     This is the workhorse for output, building up and writing
     one line at a time via called to logger()
     """
-
-    # if not first instance we DON'T write any stats out
-    if options.port:
-        return
 
     # gotta do with a write because print generates trailing space
     if options.top:
@@ -639,7 +635,9 @@ def main():
                       default='')
     parser.add_option('-v', dest='version', help='show version and exit',
                       action='store_true')
-    parser.add_option('--filter', dest='filter', help='raw event filtering',
+    parser.add_option('--ignore', dest='ignore', help='exclude matching events',
+                      default='')
+    parser.add_option('--filter', dest='filter', help='include matching events',
                       default='')
     parser.add_option('--top', dest='top', help='top format',
                       action='store_true', default=False)
@@ -655,8 +653,9 @@ def main():
         error('you must be root to run this')
 
     if options.port and not options.top and \
-            not options.term and not options.filter:
-        error('a second copy only makes sense if --filter, --term or --top')
+       not options.term and not options.filter and \
+       not options.ignore:
+        error('-p require --filter, --ignore, --term or --top')
 
     # just because it gets used everywhere
     debug = int(options.debug)
@@ -791,8 +790,13 @@ def main():
             if port_out and options.port == '':
                 sockout.sendto(data, (addr_out, port_out))
 
-            if options.filter and re.search(options.filter, data):
-                print data
+            # if filtering and/or ignoring, do it here
+            if (options.filter or options.ignore):
+                if (options.filter and not re.search(options.filter, data)) or \
+                   (options.ignore and re.search(options.ignore, data)):
+                    continue
+                print '%f %s' % (time_now, data)
+                continue
 
             # get data name, value and service type noting in the case of
             # 'removes', there is an additional metric qualifier which we
